@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Deadly Bridge</title>
+		<link rel="stylesheet" type="text/css" href="../css/canvasCSS.css">
+		<link rel="stylesheet" type="text/css" href="../css/main.css">
+		<link rel="stylesheet" type="text/css" href="../css/login.css">
+	</head>
+	<body>
+
+	<div class="center">
+		<ul class="center">
+			<li><a href="index.html">About</a></li>
+			<li><a href="game.html">Play Game</a> </li>
+		</ul>
+	</div>
+
+    <div id="box">
+        <div id="text_in_box">
+            <h2 align="center">Deadly Bridge!</h2>
+            <p>"Deadly Bridge" game is about little boy who wants to cross the bridge.
+            Unfortunately when he was crossing the bridge the undefined army starts their new weapon test.
+            This weapon is a long range machine gun which fires a different size and speed of bullets.</p>
+            <p>Poor boy has to cross the bridge to be safe. When you do that you will score. Game is set
+            to have a safe respawn zone for the boy.</p>
+            <h3 align="center">Game controls:</h3>
+            <p>To start the game you have to click somewhere on the game window (canvas).
+            To move the game character you have to use your keyboard. Game is too easy when the character
+            follows the mouse cursor. It is really easy to cheat and score so fast!</p>
+            <p>Jump to collect coins to earn more points! Coins are rare items and do not spawn often.</p>
+            <p>Every time when you pass the bridge 5 times the game level will increase.</p>
+            <p>Start the game: Click on the game window.</p>
+            <p>Stop the game: ESC</p>
+            <p>Move right: -> (right arrow)</p>
+            <p>Move left: <- (left arrow)</p>
+            <p>Jump: Space </p>
+
+        </div>
+    </div>
+
+	<div align="center">
+		<form id="Statistics">
+			<header>Statistics</header>
+            <legend id="health">Health: </legend>
+            <legend id="score">Bridge Pass: </legend>
+            <legend id="bar_highscore">Your High Score: </legend>
+            <legend id="level">Level: </legend>
+        </form>
+	</div>
+<div>
+	<div id="gameContainer">
+		<canvas id="game_canvas" style="border:1px dotted" ></canvas>
+	</div>
+</div>
+<script>
+
+deadly_bridge = function () {
+    //------------------------- Global Var, Images, Audio ------------------------------
+
+    //canvas variables
+	var canvas, game_interval;
+	canvas = document.getElementById("game_canvas");
+	canvas.width= 700;
+	canvas.height= 500;
+	var ctx=canvas.getContext("2d");
+
+	//references to DOM elements used to display game stats
+	var health_display = document.getElementById("health");
+	var score_display = document.getElementById("score");
+    var highscore_display = document.getElementById("bar_highscore");
+    var level = document.getElementById("level");
+
+    //images of player and it's grave
+	var playerImage = new Image();
+	playerImage.src = "../img/player.png";
+	var playerImageL = new Image();
+	playerImageL.src="../img/playerL.png";
+	var grave = new Image();
+	grave.src="../img/thumb.png";
+
+    //audio
+    var death = new Audio("../sounds/death.mp3");
+    var hit = new Audio("../sounds/bullet_hit.mp3");
+    var collect = new Audio("../sounds/coin.mp3");
+
+    //------------------------- Player Object --------------------------------------
+    var player = {
+		player_x: canvas.width/2,
+		player_y: canvas.height-100,
+        player_jump: canvas.height-55,
+		player_width: 30,
+		player_height: 20,
+		player_health: 100,
+		player_score: 0,
+        //to store coins collected
+        player_coins: 0,
+		player_image: playerImage,
+
+		draw: function (context) {
+			health_display.innerHTML = "Health: " + this.player_health;
+			score_display.innerHTML = "Bridge Pass: " + this.player_score;
+			context.drawImage(this.player_image,this.player_x,this.player_y,this.player_width,this.player_height);
+
+		},
+
+		reset: function () {
+			this.player_x = 0;
+			this.player_y = canvas.height/2 + 25;
+            this.player_jump = canvas.height/2 - 20;
+			this.player_width = 50;
+			this.player_height = 70;
+			this.player_health = 100;
+			this.player_score = 0;
+            this.player_coins = 0;
+			this.player_image = playerImage;
+            highscore();
+            displayLevel();
+		}
+	};
+
+    //------------------------- Physics functions --------------------------------------
+
+    //event when key is down
+	window.addEventListener("keydown", move);
+
+    //to start the game
+    canvas.addEventListener('click', start_game, false);
+
+    //moving functions
+	function moveLeft(){
+		player.player_x -= 5;
+		player.player_image = playerImageL;
+	}
+    //move right function
+	function moveRight(){
+		player.player_x += 5;
+		player.player_image = playerImage;
+	}
+    //quickly stop the game
+    function ESC(){
+        stop_game();
+    }
+    //jumping functions
+    function land() {
+        //simple variable to hold the beginning value of y
+        var landing = canvas.height/2 + 25;
+        player.player_y = landing;
+    }
+    function jump() {
+        var jumping = false;
+        do {
+            jumping=true;
+            player.player_y = player.player_jump;
+            setTimeout(land, 500);
+        }while(jumping==false)
+    }
+
+	//switch to do different movements for different cases
+	function move(event) {
+		switch (event.keyCode){
+            case 27:
+                ESC();
+                break;
+            case 37:
+				moveLeft();
+				break;
+            case 32:
+                jump();
+                break;
+			case 39:
+				moveRight();
+				break;
+		}
+		check_score();
+        displayLevel();
+        highscore();
+	}
+
+    //------------------------- Interactive functions ------------------------------------
+
+    //collision detection
+	function bullet_collision( some_bullet ) {
+		var cur;
+		var bullet_index;
+		if (
+				player.player_x < some_bullet.x + some_bullet.width &&
+				player.player_x + player.player_width > some_bullet.x &&
+				player.player_y < some_bullet.y + some_bullet.height &&
+				player.player_y + player.player_height > some_bullet.y
+		) {
+            hit.play();
+			cur = some_bullet.mass;
+			player.player_health -= cur;
+			bullet_index = the_bullets.bullets.indexOf(some_bullet);
+			if (bullet_index > -1){
+				the_bullets.bullets.splice(bullet_index,1);
+			}
+			if (player.player_health <= 0){
+                death.play();
+				player.player_health = 0;
+				player.player_image = grave;
+				stop_game();
+
+			}
+		}
+	}
+
+    //collect the coin to earn extra points
+    function coin_collect(some_coin) {
+        var coin_value;
+        var coin_index;
+        if (
+                player.player_x < some_coin.x + some_coin.width &&
+                player.player_x + player.player_width > some_coin.x &&
+                player.player_y < some_coin.y + some_coin.height &&
+                player.player_y + player.player_height > some_coin.y
+        ) {
+            collect.play();
+            coin_value = 5;
+            player.player_coins += coin_value;
+            coin_index = the_coins.coins.indexOf(some_coin);
+            if (coin_index > -1){
+                the_coins.coins.splice(coin_index,1);
+            }
+        }
+    }
+
+    //coin timeout
+    function delete_coin(some_coin){
+        var coin_index;
+
+        coin_index = the_coins.coins.indexOf(some_coin);
+        if(coin_index > -1){
+            the_coins.coins.splice(coin_index,1);
+        }
+    }
+
+    //function to score
+	function check_score() {
+		if (player.player_x >= canvas.width - 40){
+			player.player_score += 1;
+			player.player_x = 0;
+		}
+        if (player.player_x <0 )
+            player.player_x =0;
+	}
+
+    //------------------------- Bullets functions --------------------------------------
+
+    //A bullet object
+	function Bullet( x, y, dy, mass ) {
+		this.x = x;
+		this.y = y;
+		this.dy = dy;
+		this.mass = mass;
+
+		this.height = 2*this.mass;
+		this.width = 3*this.mass;
+
+		this.update_position = function () {
+			this.y += this.dy;
+		};
+
+    		this.draw = function ( context ) {
+			var bulletImage = new Image();
+				bulletImage.src = "../img/kula.png";
+				context.drawImage(bulletImage,this.x,this.y,this.width,this.height);
+
+				};
+
+			this.delete = function (that) {
+				delete the_bullets.bullets[that];
+			}
+	}
+
+	var the_bullets = {
+
+		/* an empty array to store bullets */
+		bullets: [],
+
+		// create a bullet and add it to the array of bullets
+		add_random_falling_bullet: function () {
+			var x, y,dy,mass;
+			x = Math.floor((Math.random() * canvas.width)+50);
+			y = Math.floor((Math.random() * 10)+1);
+			dy = Math.floor((Math.random() * 10)+1);
+			mass = Math.floor((Math.random() * 8)+4);
+			this.bullets.push( new Bullet( x, y, dy, mass) )
+		},
+
+		maybe_add_random_bullet: function ( how_likely ) {
+
+			var maybe = Math.random();
+			if ( maybe < how_likely) {
+				this.add_random_falling_bullet()
+			}
+		},
+
+		reset: function () {
+			this.bullets = []
+		}
+
+	};
+
+    //--------------------------- Coin functions --------------------------------------
+
+    //A coin object
+    function Coin( x, y) {
+        this.x = x;
+        this.y = y;
+        this.width = 15;
+        this.height = 15;
+
+        this.draw = function ( context ) {
+            var coinImage = new Image();
+            coinImage.src = "../img/coin.png";
+            context.drawImage(coinImage,this.x,this.y,this.width,this.height);
+        };
+
+    }
+
+    var the_coins = {
+
+        // an empty array to store coins
+        coins: [],
+
+        // create a coin and add it to the array of coins
+        add_random_coin: function () {
+            var x, y;
+            x = Math.floor((Math.random() * canvas.width)+50);
+            y = player.player_jump;
+            this.coins.push(new Coin(x, y))
+        },
+
+        maybe_add_random_coin: function ( how_likely ) {
+            var maybe = Math.random();
+            if ( maybe < how_likely) {
+                this.add_random_coin()
+            }
+        },
+
+        reset: function () {
+            this.coins = []
+        }
+
+    };
+
+    //------------------------- Display functions --------------------------------------
+
+    //update the level in the form
+    function displayLevel () {
+        if (player.player_score == 0)
+            level.innerHTML = "Level: " + 1;
+
+        if (player.player_score == 5)
+            level.innerHTML = "Level: " + 2;
+
+        if (player.player_score == 10)
+            level.innerHTML = "Level: " + 3;
+    }
+
+    //High Scores
+    function highscore(){
+        var local_score = player.player_score + player.player_coins;
+        var local_highscore = localStorage.getItem("savedHighscore");
+        //simple if statement to set the score or to get it from the browser storage
+        if (local_score > local_highscore){
+            localStorage.setItem("savedHighscore", local_score);
+            highscore_display.innerHTML = "Your High Score: " + local_score;
+        } else {
+            highscore_display.innerHTML = "Your High Score: " + local_highscore;
+        }
+
+    }
+    //------------------------- Drawing functions -------------------------------------
+    function draw_everything() {
+        var draw_score = player.player_score+player.player_coins;
+        var level;
+        // ----------- LEVEL 1 --------------
+        if (player.player_score >= 0)
+            level = 1;
+        // ----------- LEVEL 2 --------------
+        if (player.player_score >= 5)
+            level = 2;
+        // ----------- LEVEL 3 --------------
+        if (player.player_score >= 10)
+            level = 3;
+        //Clear the canvas
+        canvas.width=canvas.width;
+        ctx.fillStyle = "white";
+        ctx.font = "bold 16px Arial";
+        ctx.fillText("SCORE: " + draw_score,canvas.width - 100,canvas.height-470);
+        ctx.fillText("LEVEL: " + level,canvas.width - 690,canvas.height-30);
+        ctx.fillText("HEALTH: " + player.player_health,canvas.width - 690,canvas.height-470);
+        ctx.fillText("BRIDGE PASS: " + player.player_score,canvas.width - 150,canvas.height-30);
+        //draw the player
+        player.draw(ctx);
+        //Draw the bullets from array
+        for (i=0; i<the_bullets.bullets.length; i++) {
+            the_bullets.bullets[i].draw(ctx);
+        }
+        //Draw the coins from the array
+        for (j=0; j<the_coins.coins.length; j++) {
+            the_coins.coins[j].draw(ctx);
+        }
+    }
+
+    //------------------------- Core Game Loops --------------------------------------
+	function start_game() {
+		player.reset();
+		the_bullets.reset();
+        the_coins.reset();
+		game_interval = setInterval(game_loop, 50)
+	}
+
+	function game_loop() {
+		var bullet_index;
+        var bullet_level;
+
+        //adding different levels by generating more bullets
+        // ----------- LEVEL 1 --------------
+        if (player.player_score >= 0)
+        bullet_level = 0.1;
+        // ----------- LEVEL 2 --------------
+        if (player.player_score >= 5)
+        bullet_level = 0.15;
+        // ----------- LEVEL 3 --------------
+        if (player.player_score >= 10)
+        bullet_level = 0.2;
+
+        the_bullets.maybe_add_random_bullet(bullet_level);
+
+        the_coins.maybe_add_random_coin(0.011);
+
+        for (var j=0; j<the_coins.coins.length; j++){
+            coin_collect(the_coins.coins[j]);
+            if (the_coins.coins.length > 2){
+                delete_coin(the_coins.coins[j]);
+            }
+        }
+
+		if(the_bullets.y > canvas.height) {
+			delete the_bullets.bullets
+		}
+        //falling bullets
+        	for (var i=0; i<the_bullets.bullets.length; i++) {
+				the_bullets.bullets[i].update_position();
+				bullet_collision(the_bullets.bullets[i]);
+                //delete the gone bullets
+		if (the_bullets.bullets[i].y >= canvas.height){
+			//getting the index of that bullet
+			bullet_index=the_bullets.bullets.indexOf(the_bullets.bullets[i]);
+			//removing the bullet from the array
+			if (bullet_index > -1){
+				the_bullets.bullets.splice(bullet_index,1);
+	    		}
+    		}
+		} 
+
+		draw_everything();
+	}
+
+    //display the score and tell the player how bad he was
+    function game_over(){
+        var game_over_score = player.player_score + player.player_coins;
+        var game_highscore = localStorage.getItem("savedHighscore");
+        ctx.fillStyle = "white";
+        ctx.font = "bold 16px Arial";
+        ctx.fillText("GAME OVER!",canvas.width/2-70,canvas.height/2-100);
+        ctx.fillText("Your score was: " + game_over_score,canvas.width/2-83,canvas.height/2-70);
+        ctx.fillText("YOUR HIGH SCORE IS: " + game_highscore, canvas.width/2-115,canvas.height/2 - 40);
+        ctx.fillText("Click to play again!",canvas.width/2-85,canvas.height/2-10);
+    }
+
+	/* stop updating and re-drawing the screen */
+	function stop_game() {
+		clearInterval(game_interval);
+        setTimeout(game_over, 500);
+	}
+
+	return {
+		start_game: start_game,
+		stop_game: stop_game
+	}
+}()
+
+</script>
+</body>
+</html>

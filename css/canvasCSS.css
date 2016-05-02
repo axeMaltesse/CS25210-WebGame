@@ -1,0 +1,19 @@
+#gameContainer {
+    position: relative;
+    background-size: 700px 500px;
+    width: 700px;
+    height: auto;
+    margin: 0 auto;
+    padding-top: 40px;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    }
+
+#gameContainer canvas {
+    background: url("../img/bridge.jpg");
+    margin: 0;
+    padding: 0;
+    width: 700px;
+}
